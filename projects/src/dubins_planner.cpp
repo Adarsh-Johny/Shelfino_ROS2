@@ -1,8 +1,10 @@
 #include "target_rescue/dubins_planner.hpp"
 #include <tf2/LinearMath/Quaternion.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <cmath>
 #include <limits>
+#include <tf2/utils.h>
+
 
 /**
  * @brief Constructor to initialize the Dubins Planner
@@ -101,25 +103,21 @@ std::vector<geometry_msgs::msg::Pose> DubinsPlanner::generateDubinsPath(
 /// @param step_size The incremental step size for updating the heading.
 /// @param turning_radius The minimum turning radius of the robot.
 /// @return The updated theta after applying the step change.
-double getUpdatedTheta(const std::string &path_type, double current_theta, double step_size, double turning_radius)
+double DubinsPlanner::getUpdatedTheta(const std::string &path_type, double current_theta, double step_size, double turning_radius)
 {
-    switch (std::hash<std::string>{}(path_type)) // Hashing path_type to use in switch
+    if (path_type == "LSL" || path_type == "RLR")
     {
-    case std::hash<std::string>{}("LSL"):
-    case std::hash<std::string>{}("RLR"):
         return current_theta + step_size / turning_radius;
-
-    case std::hash<std::string>{}("LSR"):
-    case std::hash<std::string>{}("RSL"):
-    case std::hash<std::string>{}("LRL"):
-        return current_theta - step_size / turning_radius;
-
-    case std::hash<std::string>{}("RSR"):
-        return current_theta + step_size / turning_radius;
-
-    default:
-        return current_theta; // No change if unknown path type
     }
+    else if (path_type == "LSR" || path_type == "RSL" || path_type == "LRL")
+    {
+        return current_theta - step_size / turning_radius;
+    }
+    else if (path_type == "RSR")
+    {
+        return current_theta + step_size / turning_radius;
+    }
+    return current_theta; // No change if unknown path type
 }
 
 /**

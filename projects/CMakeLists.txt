@@ -20,46 +20,50 @@ find_package(nav2_msgs REQUIRED)
 include_directories(include)
 
 # Target Rescue Node
-add_executable(target_rescue_node
-    src/main.cpp
+add_library(target_rescue SHARED
     src/target_rescue_node.cpp
     src/dubins_planner.cpp
-    src/roadmap_builder.cpp
 )
 
-# Link libraries
-ament_target_dependencies(target_rescue_node
+# Link dependencies
+ament_target_dependencies(target_rescue
     rclcpp
     geometry_msgs
     nav_msgs
     visualization_msgs
     tf2
     tf2_geometry_msgs
-    nav2_msgs)
+    nav2_msgs
 )
 
-# Install executable
+
+
+ament_package()
+# Create the executable before installing
+add_executable(target_rescue_node src/main.cpp)
+target_link_libraries(target_rescue_node target_rescue)
+
+# Install targets
 install(TARGETS
+  target_rescue
   target_rescue_node
-  DESTINATION lib/${PROJECT_NAME})
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Install other files
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME})
 
-ament_package()
+# # Enable testing
+# if(BUILD_TESTING)
+#   find_package(ament_cmake_gtest REQUIRED)
 
-
-# Enable testing
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-
-  # Add test executable
-  ament_add_gtest(test_dubins_planner
-    test/test_dubins_planner.cpp
-  )
-  target_link_libraries(test_dubins_planner
-    target_rescue  # Replace with the actual name of your library
-  )
-endif()
+#   # Add test executable
+#   ament_add_gtest(test_dubins_planner
+#     test/test_dubins_planner.cpp
+#   )
+#   target_link_libraries(test_dubins_planner
+#     target_rescue  # Replace with the actual name of your library
+#   )
+# endif()

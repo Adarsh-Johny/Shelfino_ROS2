@@ -1,5 +1,5 @@
 #include "target_rescue/target_rescue_node.hpp"
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include "rclcpp/parameter.hpp"
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/follow_path.hpp>
@@ -117,7 +117,7 @@ void TargetRescueNode::computeAndPublishPath(const geometry_msgs::msg::Point &vi
     goal_pose.orientation = robot_pose_.orientation;
 
     // Compute Dubins path
-    std::vector<geometry_msgs::msg::Pose> dubins_path = dubins_planner_.planDubinsPath(robot_pose_, goal_pose); // Add dynamic obstacles if there is any
+    std::vector<geometry_msgs::msg::Pose> dubins_path = dubins_planner_.planDubinsPath(robot_pose_, goal_pose, dynamic_obstacles_);
 
     // Convert to PoseStamped for FollowPath
     std::vector<geometry_msgs::msg::PoseStamped> path_stamped;
@@ -130,15 +130,18 @@ void TargetRescueNode::computeAndPublishPath(const geometry_msgs::msg::Point &vi
 
     // Publish the path
     nav_msgs::msg::Path path_msg;
+
     path_msg.header.frame_id = "map";
     path_msg.header.stamp = this->now();
     path_msg.poses = path_stamped;
+
     path_pub_->publish(path_msg);
+
 
     RCLCPP_INFO(this->get_logger(), "Moving to victim at [%.2f, %.2f].", victim.x, victim.y);
 
     // Send FollowPath action request
-    sendFollowPathRequest(path_stamped);
+    sendFollowPathRequest(path_msg);
     robot_pose_ = dubins_path.back();
 
     // Increase score when victim is reached
@@ -161,8 +164,7 @@ void TargetRescueNode::moveToGate()
     double min_distance = std::numeric_limits<double>::max();
     for (size_t i = 0; i < gate_positions_x_.size(); i++)
     {
-        double distance = std::hypot(robot_pose_.position.x - gate_positions_x_[i],
-                                     robot_pose_.position.y - gate_positions_y_[i]);
+        double distance = std::hypot(robot_pose_.position.x - gate_positions_x_[i], robot_pose_.position.y - gate_positions_y_[i]);
         if (distance < min_distance)
         {
             min_distance = distance;
@@ -178,8 +180,8 @@ void TargetRescueNode::feedbackCallback(
     GoalHandleFollowPath::SharedPtr,
     const std::shared_ptr<const FollowPath::Feedback> feedback)
 {
-    RCLCPP_INFO(this->get_logger(), "Received FollowPath feedback: %ld points remaining.",
-                feedback->distance_remaining);
+    RCLCPP_INFO(this->get_logger(), "FollowPath feedback received: Distance to goal: %.2f meters, Speed: %.2f m/s",
+                feedback->distance_to_goal, feedback->speed);
 }
 
 void TargetRescueNode::resultCallback(const GoalHandleFollowPath::WrappedResult &result)
@@ -187,12 +189,6 @@ void TargetRescueNode::resultCallback(const GoalHandleFollowPath::WrappedResult 
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
     {
         RCLCPP_INFO(this->get_logger(), "FollowPath action completed successfully!");
-
-        // Print the final score if the robot has reached the gate
-        if (victims_rescued_ == total_victims_)
-        {
-            RCLCPP_INFO(this->get_logger(), "Final Score: %d", score_);
-        }
     }
     else
     {
@@ -200,9 +196,8 @@ void TargetRescueNode::resultCallback(const GoalHandleFollowPath::WrappedResult 
     }
 }
 
-void TargetRescueNode::goalResponseCallback(std::shared_future<GoalHandleFollowPath::SharedPtr> future)
+void TargetRescueNode::goalResponseCallback(std::shared_ptr<GoalHandleFollowPath> goal_handle)
 {
-    auto goal_handle = future.get();
     if (!goal_handle)
     {
         RCLCPP_ERROR(this->get_logger(), "FollowPath action goal was rejected.");
@@ -213,33 +208,40 @@ void TargetRescueNode::goalResponseCallback(std::shared_future<GoalHandleFollowP
     }
 }
 
-// FollowPath Action Client
-void TargetRescueNode::sendFollowPathRequest(const std::vector<geometry_msgs::msg::PoseStamped> &path)
+void TargetRescueNode::sendFollowPathRequest(const nav_msgs::msg::Path &path)
 {
-    RCLCPP_INFO(this->get_logger(), "Moving to gate...");
+    RCLCPP_INFO(this->get_logger(), "Sending FollowPath action request...");
 
-    // Wait for the action server
-    if (!this->follow_path_client_->wait_for_action_server(std::chrono::seconds(10)))
+    if (!follow_path_client_->wait_for_action_server(std::chrono::seconds(10)))
     {
-        RCLCPP_ERROR(this->get_logger(), "Action server for FollowPath not available after waiting.");
-        rclcpp::shutdown();
+        RCLCPP_ERROR(this->get_logger(), "FollowPath action server not available after waiting.");
         return;
     }
 
-    // Create goal message
+    // Create a goal message
     auto goal_msg = FollowPath::Goal();
-    goal_msg.path.poses = path;
-    goal_msg.path.header.frame_id = "map";
+    goal_msg.path = path;
+    goal_msg.path.header.frame_id = "map";  // Ensure the correct frame
     goal_msg.path.header.stamp = this->now();
 
-    RCLCPP_INFO(this->get_logger(), "Sending goal to FollowPath action server...");
-
-    // Configure goal options and callbacks
+    // Define action options and bind callbacks
     auto send_goal_options = rclcpp_action::Client<FollowPath>::SendGoalOptions();
-    send_goal_options.goal_response_callback = std::bind(&TargetRescueNode::goalResponseCallback, this, std::placeholders::_1);
-    send_goal_options.feedback_callback = std::bind(&TargetRescueNode::feedbackCallback, this, std::placeholders::_1, std::placeholders::_2);
-    send_goal_options.result_callback = std::bind(&TargetRescueNode::resultCallback, this, std::placeholders::_1);
 
-    // Send goal asynchronously
-    this->follow_path_client_->async_send_goal(goal_msg, send_goal_options);
+    send_goal_options.goal_response_callback = 
+        [this](std::shared_ptr<GoalHandleFollowPath> goal_handle) {
+            goalResponseCallback(goal_handle);
+        };
+
+    send_goal_options.feedback_callback = 
+        [this](GoalHandleFollowPath::SharedPtr goal_handle, const std::shared_ptr<const FollowPath::Feedback> feedback) {
+            feedbackCallback(goal_handle, feedback);
+        };
+
+    send_goal_options.result_callback = 
+        [this](const GoalHandleFollowPath::WrappedResult &result) {
+            resultCallback(result);
+        };
+
+    // Send goal
+    follow_path_client_->async_send_goal(goal_msg, send_goal_options);
 }

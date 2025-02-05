@@ -39,12 +39,11 @@ private:
 
     // Path computation and execution
     void computeAndPublishPath(const geometry_msgs::msg::Point &victim);
-    void sendFollowPathRequest(const std::vector<geometry_msgs::msg::PoseStamped> &path);
+    void sendFollowPathRequest(const nav_msgs::msg::Path &path);
     void moveToGate(); // New function for navigating to the gate
-
-    void goalResponseCallback(std::shared_future<GoalHandleFollowPath::SharedPtr> future);
-    void feedbackCallback(GoalHandleFollowPath::SharedPtr, const std::shared_ptr<const FollowPath::Feedback> feedback);
-    void resultCallback(const GoalHandleFollowPath::WrappedResult &result);
+    void goalResponseCallback(std::shared_ptr<GoalHandleFollowPath>);
+    void feedbackCallback(GoalHandleFollowPath::SharedPtr, const std::shared_ptr<const FollowPath::Feedback>);
+    void resultCallback(const GoalHandleFollowPath::WrappedResult &);
 
     // Robot state
     geometry_msgs::msg::Pose robot_pose_;
@@ -57,6 +56,19 @@ private:
     // Gate positions
     std::vector<double> gate_positions_x_;
     std::vector<double> gate_positions_y_;
+
+    int n_obstacles_;
+    bool no_cylinders_;
+    bool no_boxes_;
+    std::vector<double> obstacle_positions_x_;
+    std::vector<double> obstacle_positions_y_;
+    int n_victims_;
+    std::vector<double> victim_positions_x_;
+    std::vector<double> victim_positions_y_;
+    std::vector<geometry_msgs::msg::Point> victim_positions_;
+    std::vector<geometry_msgs::msg::Point> dynamic_obstacles_;
+    std::vector<geometry_msgs::msg::Point> map_borders_;
+
 };
 
 #endif // TARGET_RESCUE_NODE_HPP
