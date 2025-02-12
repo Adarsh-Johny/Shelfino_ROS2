@@ -197,13 +197,10 @@ def generate_launch_description():
     shelfino_nav2_pkg  = get_package_share_directory('shelfino_navigation')
     shelfino_gaze_pkg  = get_package_share_directory('shelfino_gazebo')
     map_env_pkg        = get_package_share_directory('map_pkg')
-    target_rescue_pkg  = get_package_share_directory('projects')
-
 
     nav2_params_file_path = os.path.join(shelfino_nav2_pkg, 'config', 'shelfino.yaml')
     map_env_params_file_path = os.path.join(map_env_pkg, 'config', 'map_config.yaml')
     gen_map_params_file_path = os.path.join(map_env_pkg, 'config', 'full_config.yaml')
-    rescue_params_file = os.path.join(target_rescue_pkg, 'config', 'rescue_params.yaml')
 
     # General arguments
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
@@ -374,18 +371,6 @@ def generate_launch_description():
         spawn_map_launch,
     ]
 
-    # Add Target Rescue Node
-    target_rescue_node = Node(
-        package='projects',
-        executable='target_rescue_node',
-        name='target_rescue_node',
-        output='screen',
-        parameters=[
-            rescue_params_file,
-            {'use_sim_time': use_sim_time}
-        ],
-    )
-    
     def launch_after_config_nodes(event : ProcessExited, context : LaunchContext):
         return after_config_nodes 
 
@@ -406,26 +391,6 @@ def generate_launch_description():
             on_exit=launch_after_spawn_map_nodes
         )
     )
-    
-    # Event to handle node sequence
-    def after_map_setup(event, context):
-        return [
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(os.path.join(map_env_pkg, 'launch', 'spawn_map.launch.py')),
-                launch_arguments={
-                    'gen_map_params_file': gen_map_params_file,
-                    'victims_activated': 'true'
-                }.items(),
-            ),
-            target_rescue_node
-        ]
-
-    spawn_map_handler = RegisterEventHandler(
-        OnProcessExit(
-            target_action=gen_config_node,
-            on_exit=after_map_setup,
-        )
-    )
 
     # LaunchDescription 
     ld = LaunchDescription()
@@ -438,7 +403,6 @@ def generate_launch_description():
     ld.add_action(gazebo_launch)
 
     ld.add_action(gen_config_node)
-    ld.add_action(spawn_map_handler)
 
     ld.add_action(gen_config_eh)
 
