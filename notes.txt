@@ -1,0 +1,14 @@
+starting postion - same postion of robot
+compute-path-pose
+
+
+ros2 topic info /shelfino1/plan1
+publish the path to see if its correct
+
+
+create a topic to publish map is generated then call the target rescue node
+
+
+QOS for subscription - as the sub is not getting executed after the node is up
+
+starting postion of the path should be robot's current position
