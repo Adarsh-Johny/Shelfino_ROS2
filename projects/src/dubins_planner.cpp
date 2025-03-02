@@ -5,46 +5,36 @@
 #include <limits>
 #include <tf2/utils.h>
 
+// Constructor
+DubinsPlanner::DubinsPlanner(double turning_radius, rclcpp::Logger logger)
+    : turning_radius_(turning_radius), logger_(logger) {}
 
-/**
- * @brief Constructor to initialize the Dubins Planner
- * @param turning_radius The minimum turning radius of the robot.
- */
-DubinsPlanner::DubinsPlanner(double turning_radius) : turning_radius_(turning_radius) {}
-
-/**
- * @brief Plans the best Dubins path between start and goal positions.
- * @param start The starting pose.
- * @param goal The goal pose.
- * @param dynamic_obstacles List of dynamic obstacles to avoid. TODO
- * @return The shortest valid Dubins path as a vector of poses.
- */
+// Plan Dubins
 std::vector<geometry_msgs::msg::Pose> DubinsPlanner::planDubinsPath(
     const geometry_msgs::msg::Pose &start,
     const geometry_msgs::msg::Pose &goal,
     const std::vector<geometry_msgs::msg::Point> &dynamic_obstacles)
 {
+    RCLCPP_INFO(logger_, "Planning Dubins Path from [%.2f, %.2f] to [%.2f, %.2f]...",
+                start.position.x, start.position.y, goal.position.x, goal.position.y);
+
     std::vector<geometry_msgs::msg::Pose> best_path;
     double best_cost = std::numeric_limits<double>::max();
 
-    // Extract start and goal positions and orientations
     double start_x = start.position.x;
     double start_y = start.position.y;
     double start_theta = tf2::getYaw(start.orientation);
     double goal_x = goal.position.x;
     double goal_y = goal.position.y;
-    double goal_theta = tf2::getYaw(goal.orientation);
 
-    // Compute all six Dubins paths and evaluate them
     std::vector<std::vector<geometry_msgs::msg::Pose>> possible_paths = {
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "LSL"),
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "LSR"),
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "RSL"),
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "RSR"),
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "RLR"),
-        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, goal_theta, "LRL")};
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "LSL"),
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "LSR"),
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "RSL"),
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "RSR"),
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "RLR"),
+        generateDubinsPath(start_x, start_y, start_theta, goal_x, goal_y, "LRL")};
 
-    // Select the shortest valid Dubins path
     for (const auto &path : possible_paths)
     {
         double path_length = calculatePathLength(path);
@@ -52,57 +42,52 @@ std::vector<geometry_msgs::msg::Pose> DubinsPlanner::planDubinsPath(
         {
             best_cost = path_length;
             best_path = path;
+            RCLCPP_INFO(logger_, "Selected path type: %s, Length: %.2f", "LSL", path_length);
         }
     }
 
     return best_path;
 }
 
-/**
- * @brief Computes a Dubins path of a specific type(LSL,LSR,RSL,RSR,RLR,LRL).
- * @param start_x, start_y, start_theta The starting position and orientation.
- * @param goal_x, goal_y, goal_theta The goal position and orientation.
- * @param path_type The type of Dubins path (LSL, RSR, etc.).
- * @return A vector of poses representing the computed Dubins path.
- */
+
+
+// Generate Dubins path
 std::vector<geometry_msgs::msg::Pose> DubinsPlanner::generateDubinsPath(
     double start_x, double start_y, double start_theta,
-    double goal_x, double goal_y, double goal_theta, const std::string &path_type)
+    double goal_x, double goal_y, const std::string &path_type)
 {
     std::vector<geometry_msgs::msg::Pose> path;
     double step_size = 0.1;
     double current_x = start_x;
     double current_y = start_y;
     double current_theta = start_theta;
-
+    int step = 1;
     while (std::sqrt(std::pow(current_x - goal_x, 2) + std::pow(current_y - goal_y, 2)) > step_size)
     {
         geometry_msgs::msg::Pose pose;
-
-        // Get updated theta based on Dubins path type
         current_theta = getUpdatedTheta(path_type, current_theta, step_size, turning_radius_);
-
-        // Update position based on new heading
         current_x += step_size * std::cos(current_theta);
         current_y += step_size * std::sin(current_theta);
 
-        // Store pose
         pose.position.x = current_x;
         pose.position.y = current_y;
         pose.orientation = tf2::toMsg(tf2::Quaternion(0, 0, std::sin(current_theta / 2), std::cos(current_theta / 2)));
 
+        RCLCPP_INFO(logger_, "PATHHHHHHH: x: %f -- y: %f Length",pose.position.x, pose.position.y);
+
         path.push_back(pose);
+
+        step++;
+
+        if(step > 15000){
+            break;
+        }
     }
 
     return path;
 }
 
-/// @brief Computes the updated heading (theta) based on the Dubins path type.
-/// @param path_type The type of Dubins path (LSL, RSR, etc.).
-/// @param current_theta The current heading angle of the robot.
-/// @param step_size The incremental step size for updating the heading.
-/// @param turning_radius The minimum turning radius of the robot.
-/// @return The updated theta after applying the step change.
+// Get updated theta
 double DubinsPlanner::getUpdatedTheta(const std::string &path_type, double current_theta, double step_size, double turning_radius)
 {
     if (path_type == "LSL" || path_type == "RLR")
@@ -117,14 +102,10 @@ double DubinsPlanner::getUpdatedTheta(const std::string &path_type, double curre
     {
         return current_theta + step_size / turning_radius;
     }
-    return current_theta; // No change if unknown path type
+    return current_theta;
 }
 
-/**
- * @brief Computes the total length of a given path.
- * @param path The vector of poses representing the path.
- * @return The total path length.
- */
+// Compute path length
 double DubinsPlanner::calculatePathLength(const std::vector<geometry_msgs::msg::Pose> &path)
 {
     double length = 0.0;
@@ -137,21 +118,18 @@ double DubinsPlanner::calculatePathLength(const std::vector<geometry_msgs::msg::
     return length;
 }
 
-/**
- * @brief Checks if a computed path collides with any dynamic obstacles.
- * @param path The vector of poses representing the path.
- * @param dynamic_obstacles A vector of obstacle positions.
- * @return True if a collision is detected, false otherwise.
- */
+// Check for collisions
 bool DubinsPlanner::isCollision(const std::vector<geometry_msgs::msg::Pose> &path,
                                 const std::vector<geometry_msgs::msg::Point> &dynamic_obstacles) const
 {
+    RCLCPP_INFO(logger_, "Checking for collisions...");
+
     for (const auto &pose : path)
     {
         for (const auto &obstacle : dynamic_obstacles)
         {
             double distance = std::hypot(obstacle.x - pose.position.x, obstacle.y - pose.position.y);
-            if (distance < 0.5) // Assume obstacle radius of 0.5 meters
+            if (distance < 1.0)
             {
                 return true;
             }

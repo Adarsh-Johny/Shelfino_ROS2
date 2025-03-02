@@ -1,16 +1,14 @@
-#ifndef TARGET_RESCUE_NODE_HPP
-#define TARGET_RESCUE_NODE_HPP
+#ifndef TARGET_RESCUE_NODE_HPP_
+#define TARGET_RESCUE_NODE_HPP_
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
-#include "nav2_msgs/action/follow_path.hpp"
-#include "visualization_msgs/msg/marker_array.hpp"
 #include "nav_msgs/msg/path.hpp"
-#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
+#include "graph_msgs/msg/geometry_graph.hpp"
+#include "obstacles_msgs/msg/obstacle_array_msg.hpp"
+#include "nav2_msgs/action/follow_path.hpp"
 #include "target_rescue/dubins_planner.hpp"
-
-using FollowPath = nav2_msgs::action::FollowPath;
-using GoalHandleFollowPath = rclcpp_action::ClientGoalHandle<FollowPath>;
 
 class TargetRescueNode : public rclcpp::Node
 {
@@ -18,57 +16,60 @@ public:
     TargetRescueNode();
 
 private:
-    // Path planner
-    DubinsPlanner dubins_planner_;
-
     // Subscribers
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr victims_sub_;
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr map_borders_sub_;
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr obstacles_sub_;
+    rclcpp::Subscription<graph_msgs::msg::GeometryGraph>::SharedPtr roadmap_sub_;
 
-    // Publishers
+    rclcpp::Subscription<obstacles_msgs::msg::ObstacleArrayMsg>::SharedPtr victim_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr robot_pose_sub_;
+
+    // Publisher
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
-    // Action client for FollowPath
-    rclcpp_action::Client<FollowPath>::SharedPtr follow_path_client_;
+    // Action client
+    rclcpp_action::Client<nav2_msgs::action::FollowPath>::SharedPtr follow_path_client_;
 
-    // Callbacks
-    void victimsCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg);
-    void obstaclesCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg);
-    void mapBordersCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg);
+    // Stored data
+    graph_msgs::msg::GeometryGraph roadmap_;
 
-    // Path computation and execution
-    void computeAndPublishPath(const geometry_msgs::msg::Point &victim);
-    void sendFollowPathRequest(const nav_msgs::msg::Path &path);
-    void moveToGate(); // New function for navigating to the gate
-    void goalResponseCallback(std::shared_ptr<GoalHandleFollowPath>);
-    void feedbackCallback(GoalHandleFollowPath::SharedPtr, const std::shared_ptr<const FollowPath::Feedback>);
-    void resultCallback(const GoalHandleFollowPath::WrappedResult &);
-
-    // Robot state
+    std::vector<geometry_msgs::msg::Point> victim_positions_;
     geometry_msgs::msg::Pose robot_pose_;
 
-    // Score tracking
-    int score_;           // Tracks the score based on rescued victims
-    int victims_rescued_; // Counter for rescued victims
-    int total_victims_;   // Total number of victims detected
-
-    // Gate positions
-    std::vector<double> gate_positions_x_;
-    std::vector<double> gate_positions_y_;
-
-    int n_obstacles_;
-    bool no_cylinders_;
-    bool no_boxes_;
-    std::vector<double> obstacle_positions_x_;
-    std::vector<double> obstacle_positions_y_;
-    int n_victims_;
+    // Parameters
     std::vector<double> victim_positions_x_;
     std::vector<double> victim_positions_y_;
-    std::vector<geometry_msgs::msg::Point> victim_positions_;
-    std::vector<geometry_msgs::msg::Point> dynamic_obstacles_;
-    std::vector<geometry_msgs::msg::Point> map_borders_;
+    std::vector<double> gate_positions_x_;
+    std::vector<double> gate_positions_y_;
+    int num_victims_;
 
+    // Dubins planner
+    DubinsPlanner dubins_planner_;
+    const rmw_qos_profile_t rmw_qos_profile_custom =
+    {
+        RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+        100,
+        RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+        RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
+        RMW_QOS_DEADLINE_DEFAULT,
+        RMW_QOS_LIFESPAN_DEFAULT,
+        RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+        RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+        false
+    };
+    rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1), rmw_qos_profile_custom);
+
+
+    // Callbacks
+    void roadmap_callback(const graph_msgs::msg::GeometryGraph::SharedPtr msg);
+
+    void victim_callback(const obstacles_msgs::msg::ObstacleArrayMsg::SharedPtr msg);
+    void robot_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
+
+    // Path planning
+    void plan_rescue_path();
+    void computeAndPublishPath(const geometry_msgs::msg::Point &victim);
+    void publish_path(const std::vector<geometry_msgs::msg::Pose> &dubins_path);
+    void moveToGate();
+    void sendFollowPathRequest(const nav_msgs::msg::Path &path);
 };
 
-#endif // TARGET_RESCUE_NODE_HPP
+#endif // TARGET_RESCUE_NODE_HPP_

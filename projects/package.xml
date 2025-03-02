@@ -8,18 +8,26 @@
     - Multi-agent path finding: mapf.launch.py 
     - Victims rescue: victims.launch.py 
     - Purseur evader: pv.launch.py 
-  </description>
-  <maintainer email="enrico.saccon@unitn.it">enrico</maintainer>
-  <maintainer email="placido.falqueto@unitn.it">placido</maintainer>
+  </description>  
+  <maintainer email="adarshjohny02@gmail.com">Adarsh</maintainer>
   <license>Apache 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-
+  
   <depend>shelfino_gazebo</depend>
   <depend>shelfino_description</depend>
   <depend>shelfino_navigation</depend>
-  <!-- <depend>evader</depend> -->
   <depend>map_pkg</depend>
+  <depend>rclcpp</depend>
+  <depend>nav2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>obstacles_msgs</depend>
+  <depend>graph_msgs</depend>
+
 
   <export>
     <build_type>ament_cmake</build_type>

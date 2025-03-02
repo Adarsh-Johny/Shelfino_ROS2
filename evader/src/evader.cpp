@@ -232,7 +232,7 @@ void Evader::move(const Path& path)
     RCLCPP_ERROR(this->get_logger(), "Action server for FollowPath not available after waiting.");
     exit(1);
   }
-
+// Follow path --------------------------------------------------------------
   auto action_msg = FollowPath::Goal();
   action_msg.path = path;
 
@@ -244,6 +244,8 @@ void Evader::move(const Path& path)
   send_goal_options.result_callback = std::bind(&Evader::result_path_following_callback, this, std::placeholders::_1);
 
   this->follow_path_client_->async_send_goal(action_msg, send_goal_options);
+// Follow path --------------------------------------------------------------
+
 }
 
 void Evader::goal_response_path_following_callback(

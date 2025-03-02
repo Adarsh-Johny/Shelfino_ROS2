@@ -33,24 +33,12 @@
     - -1.5707963267948966
 /**/send_obstacles:
   ros__parameters:
-    vect_dim_x:
-    - 0.5173707590403944
-    - 0.6209815009792079
-    vect_dim_y:
-    - 0.7826317033244914
-    - 0.9178957110967906
-    vect_type:
-    - box
-    - box
-    vect_x:
-    - 7.483118837651215
-    - 3.1303384971672124
-    vect_y:
-    - 7.636361762591182
-    - 1.3691853605467514
-    vect_yaw:
-    - -1.992433089071727
-    - 0.27652666689840677
+    vect_x: [1.0, -2.5, 4.0]
+    vect_y: [3.0, 5.5, -1.0]
+    vect_type: ["box", "box", "cylinder"]
+    vect_dim_x: [0.5, 0.7, 1.0]
+    vect_dim_y: [0.5, 0.7, 1.0]
+    vect_yaw: [0.0, 1.57, -0.5]
 /**/send_timeout:
   ros__parameters:
     victims_timeout: 1000000
@@ -58,7 +46,7 @@
   ros__parameters:
     max_weight: 500.0
     min_weight: 10.0
-    vect_weight: []
-    vect_x: []
-    vect_y: []
-    victims_activated: false
+    vect_weight: [100.0, 200.0, 150.0]
+    vect_x: [3.0, 1.0, -3.0]
+    vect_y: [3.0, -2.0, -3.0]
+    victims_activated: true

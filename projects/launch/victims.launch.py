@@ -129,16 +129,16 @@ def generate_launch_description():
 
     # General arguments
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    shelfino_name  = LaunchConfiguration('shelfino_name', default='shelfino')
+    shelfino_name  = LaunchConfiguration('shelfino_name', default='shelfino1')
 
     # Gazebo simulation arguments
     use_gui           = LaunchConfiguration('use_gui', default='true')
-    use_rviz          = LaunchConfiguration('use_rviz', default='true')
+    use_rviz          = LaunchConfiguration('use_rviz', default='false')
     rviz_config_file  = LaunchConfiguration('rviz_config_file', default=os.path.join(shelfino_desc_pkg, 'rviz', 'shelfino.rviz'))
     gazebo_world_file = LaunchConfiguration('gazebo_world_file', default=os.path.join(shelfino_gaze_pkg, 'worlds', 'empty.world'))
 
     # Shelfino related arguments
-    spawn_shelfino    = LaunchConfiguration('spawn_shelfino', default='false')
+    spawn_shelfino    = LaunchConfiguration('spawn_shelfino', default='true')
     shelfino_init_x   = LaunchConfiguration('shelfino_init_x', default='0.0')
     shelfino_init_y   = LaunchConfiguration('shelfino_init_y', default='0.0')
     shelfino_init_yaw = LaunchConfiguration('shelfino_init_yaw', default='0.0')
@@ -367,6 +367,21 @@ def generate_launch_description():
         sim_nodes, 
         kill_shelfino_node,
     ]
+    
+    map_generator_node = Node(
+    package="projects",
+    executable="map_generator_node",
+    name="map_generator",
+    output="screen"
+)
+
+    # target_rescue_node = Node(
+    #     package="projects",
+    #     executable="target_rescue_node",
+    #     name="shelfino1",
+    #     output="screen",
+    #     parameters=[{"use_sim_time": True}]
+    # )
 
     def launch_nodes(event : ProcessExited, context : LaunchContext):
         return nodes 
@@ -399,7 +414,10 @@ def generate_launch_description():
     ld.add_action(gen_config_node)
     ld.add_action(gen_config_eh)
     ld.add_action(map_spawn_eh)
-
+    
+    # ld.add_action(target_rescue_node)
+    ld.add_action(map_generator_node)
+    
     ld.add_action(OpaqueFunction(function=evaluate_rviz))
 
     return ld

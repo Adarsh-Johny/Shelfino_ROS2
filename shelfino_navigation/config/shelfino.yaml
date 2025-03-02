@@ -169,6 +169,8 @@ controller_server:
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["goal_checker"]
     controller_plugins: ["FollowPath"]
+    current_goal_checker: "goal_checker" # Added newly TODO::: REMOVE LATER
+
 
     # Progress checker parameters
     progress_checker:
